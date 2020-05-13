@@ -195,6 +195,130 @@ public class ConscryptEngineTest {
     }
 
     @Test
+    public void closingInboundAfterClosingOutboundHandshakes_NoAlerts() throws Exception {
+        // Client and server both close inbound after closing outbound without seeing the other's
+        // close alert (e.g. due to the transport being closed already or exact simultaneous
+        // closure).
+        setupEngines(TestKeyStore.getClient(), TestKeyStore.getServer());
+        doHandshake(true);
+
+        clientEngine.closeOutbound();
+        serverEngine.closeOutbound();
+        // After closeOutbound, wrap should produce the TLS close alerts.
+        assertTrue(wrapClosed(clientEngine).hasRemaining());
+        assertTrue(wrapClosed(serverEngine).hasRemaining());
+
+        assertFalse(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertFalse(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+
+        // Closing inbound should succeed but produce no new handshake data.
+        clientEngine.closeInbound();
+        serverEngine.closeInbound();
+        assertFalse(wrapClosed(clientEngine).hasRemaining());
+        assertFalse(wrapClosed(serverEngine).hasRemaining());
+
+        // Final state, everything closed.
+        assertTrue(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertTrue(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+    }
+
+    @Test
+    public void closingInboundAfterClosingOutboundHandshakes_AlertsArriveBeforeCloseInbound()
+            throws Exception {
+        // Client and server both call closeOutbound simultaneously.  The alerts produced
+        // by this both arrive at the peer before it calls closeInbound, causing the
+        // connection to be closed immediately (RFC 2246, §7.2.1) and so the
+        // closeInbound call should be a no-op which generates no data.
+        setupEngines(TestKeyStore.getClient(), TestKeyStore.getServer());
+        doHandshake(true);
+
+        clientEngine.closeOutbound();
+        // After closeOutbound, wrap should produce a single output buffer with the TLS close alert
+        ByteBuffer clientOutput = wrapClosed(clientEngine);
+        assertTrue(clientOutput.hasRemaining());
+
+        // Unwrapping that on the server engine should cause it to close and send its own alert
+        // but produce no application data.
+        assertFalse(unwrapClosed(serverEngine, clientOutput).hasRemaining());
+        ByteBuffer serverOutput = wrapClosed(serverEngine);
+        assertTrue(serverOutput.hasRemaining());
+
+        // At his point, server should be fully closed after processing client's alert and sending
+        // its own.  Client inbound is still open.
+        assertFalse(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertTrue(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+
+        // Explicitly closing the server outbound should produce no new extra handshake data
+        serverEngine.closeOutbound();
+        assertFalse(wrapClosed(serverEngine).hasRemaining());
+
+        // Unwrapping the server output on the client should cause it to close as above
+        // but produce no new handshaking data and no new application data.
+        assertFalse(unwrapClosed(clientEngine, serverOutput).hasRemaining());
+        assertFalse(wrapClosed(clientEngine).hasRemaining());
+
+        // Everything should be fully closed by this point.
+        assertTrue(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertTrue(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+
+        // Closing inbounds should now be a no-op and produce no new handshake data.
+        clientEngine.closeInbound();
+        serverEngine.closeInbound();
+        assertFalse(wrapClosed(clientEngine).hasRemaining());
+        assertFalse(wrapClosed(serverEngine).hasRemaining());
+    }
+
+    @Test
+    public void closingInboundAfterClosingOutboundHandshakes_AlertsArriveAfterCloseInbound()
+            throws Exception {
+        // Client and server both call closeOutbound simultaneously.  The alerts produced
+        // by this both arrive at the peer after it calls closeInbound.  Verify that
+        // unwrapping the alerts produces no further application data.
+        setupEngines(TestKeyStore.getClient(), TestKeyStore.getServer());
+        doHandshake(true);
+
+        // After closeOutbound, wrap should produce a single output buffer with the TLS close alert
+        clientEngine.closeOutbound();
+        ByteBuffer clientOutput = wrapClosed(clientEngine);
+        assertTrue(clientOutput.hasRemaining());
+        serverEngine.closeOutbound();
+        ByteBuffer serverOutput = wrapClosed(serverEngine);
+        assertTrue(serverOutput.hasRemaining());
+
+        assertFalse(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertFalse(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+
+        // Closing inbounds should succeed but produce no new handshake data.
+        clientEngine.closeInbound();
+        serverEngine.closeInbound();
+        assertFalse(wrapClosed(clientEngine).hasRemaining());
+        assertFalse(wrapClosed(serverEngine).hasRemaining());
+
+        // Everything should be fully closed by this point.
+        assertTrue(clientEngine.isInboundDone());
+        assertTrue(clientEngine.isOutboundDone());
+        assertTrue(serverEngine.isInboundDone());
+        assertTrue(serverEngine.isOutboundDone());
+
+        // Unwrapping the previous handshake data should also succeed, and produce no
+        // new application or handshake data as both sides of the connection are fully closed.
+        assertFalse(unwrapClosed(serverEngine, clientOutput).hasRemaining());
+        assertFalse(wrapClosed(serverEngine).hasRemaining());
+        assertFalse(unwrapClosed(clientEngine, serverOutput).hasRemaining());
+        assertFalse(wrapClosed(clientEngine).hasRemaining());
+    }
+
+    @Test
     public void mutualAuthWithSameCertsShouldSucceed() throws Exception {
         doMutualAuthHandshake(TestKeyStore.getServer(), TestKeyStore.getServer(), ClientAuth.NONE);
     }
@@ -491,6 +615,30 @@ public class ConscryptEngineTest {
             wrapped.add(encryptedBuffer);
         }
         return wrapped;
+    }
+
+    private ByteBuffer wrapClosed(SSLEngine engine) throws SSLException {
+        // Call wrap with empty input and return any handshaking data produced, asserting
+        // the engine is already in a closed state.
+        ByteBuffer emptyInput = bufferType.newBuffer(0);
+        ByteBuffer encryptedBuffer =
+                bufferType.newBuffer(engine.getSession().getPacketBufferSize());
+        SSLEngineResult wrapResult = engine.wrap(emptyInput, encryptedBuffer);
+        assertEquals(Status.CLOSED, wrapResult.getStatus());
+        encryptedBuffer.flip();
+        return encryptedBuffer;
+    }
+
+    private ByteBuffer unwrapClosed(SSLEngine engine, ByteBuffer encrypted) throws SSLException {
+        // Unwrap a single buffer and return the plaintext, asserting the engine is already in a
+        // closed state.
+        final ByteBuffer decryptedBuffer
+                = bufferType.newBuffer(engine.getSession().getPacketBufferSize());
+
+        SSLEngineResult unwrapResult = engine.unwrap(encrypted, decryptedBuffer);
+        assertEquals(Status.CLOSED, unwrapResult.getStatus());
+        decryptedBuffer.flip();
+        return decryptedBuffer;
     }
 
     private byte[] unwrap(ByteBuffer[] encryptedBuffers, SSLEngine engine) throws IOException {
