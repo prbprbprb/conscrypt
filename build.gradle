@@ -1,5 +1,5 @@
 import org.ajoberstar.grgit.Grgit
-import org.gradle.util.VersionNumber
+import org.conscrypt.VersionCode
 
 buildscript {
     ext.android_tools = 'com.android.tools.build:gradle:7.4.0'
@@ -72,9 +72,11 @@ subprojects {
 
     group = "org.conscrypt"
     description = 'Conscrypt is an alternate Java Security Provider that uses BoringSSL'
-    version = "2.6-SNAPSHOT"
+    version = "2.6.0-SNAPSHOT"
 
     ext {
+        parsedVersion = new VersionCode(version)
+
         // Needs to be binary compatible with androidMinSdkVersion
         androidMinJavaVersion = JavaVersion.VERSION_1_8
 
@@ -143,12 +145,13 @@ subprojects {
     }
 
     tasks.register("generateProperties", WriteProperties) {
-        ext {
-            parsedVersion = VersionNumber.parse(version)
-        }
-        property("org.conscrypt.version.major", parsedVersion.getMajor())
-        property("org.conscrypt.version.minor", parsedVersion.getMinor())
-        property("org.conscrypt.version.patch", parsedVersion.getMicro())
+// XXX comment
+//        ext {
+//            parsedVersion = new VersionCode(version)
+//        }
+        property("org.conscrypt.version.major", parsedVersion.major)
+        property("org.conscrypt.version.minor", parsedVersion.minor)
+        property("org.conscrypt.version.patch", parsedVersion.patch)
         property("org.conscrypt.boringssl.version", boringSslVersion)
         outputFile "build/generated/resources/org/conscrypt/conscrypt.properties"
     }
@@ -230,3 +233,4 @@ subprojects {
 static String normalizePath(path) {
     new File(path.toString()).absolutePath
 }
+

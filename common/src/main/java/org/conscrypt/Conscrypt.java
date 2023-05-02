@@ -15,14 +15,12 @@
  */
 package org.conscrypt;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.KeyManagementException;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.cert.X509Certificate;
-import java.util.Properties;
+
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -37,7 +35,6 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import org.conscrypt.io.IoUtils;
 
 /**
  * Core API for creating and configuring all Conscrypt types.
@@ -69,6 +66,8 @@ public final class Conscrypt {
         }
     }
 
+    // Ideally this wouldn't be an inner class of Conscrypt which would make things cleaner,
+    // but we already published it as an API.
     public static class Version {
         private final int major;
         private final int minor;
@@ -85,33 +84,11 @@ public final class Conscrypt {
         public int patch() { return patch; }
     }
 
-    private static final Version VERSION;
-
-    static {
-        int major = -1;
-        int minor = -1;
-        int patch = -1;
-        InputStream stream = null;
-        try {
-            stream = Conscrypt.class.getResourceAsStream("conscrypt.properties");
-            if (stream != null) {
-                Properties props = new Properties();
-                props.load(stream);
-                major = Integer.parseInt(props.getProperty("org.conscrypt.version.major", "-1"));
-                minor = Integer.parseInt(props.getProperty("org.conscrypt.version.minor", "-1"));
-                patch = Integer.parseInt(props.getProperty("org.conscrypt.version.patch", "-1"));
-            }
-        } catch (IOException e) {
-            // TODO(prb): This should probably be fatal or have some fallback behaviour
-        } finally {
-            IoUtils.closeQuietly(stream);
-        }
-        if ((major >= 0) && (minor >= 0) && (patch >= 0)) {
-            VERSION = new Version(major, minor, patch);
-        } else {
-            VERSION = null;
-        }
-    }
+    // Initialise from generated org.conscrypt.Properties class.
+    private static final Version VERSION = new Version(
+        PropertyConstants.VERSION_MAJOR,
+        PropertyConstants.VERSION_MINOR,
+        PropertyConstants.VERSION_PATCH);
 
     /**
      * Returns the version of this distribution of Conscrypt.  If version information is

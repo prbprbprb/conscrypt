@@ -24,6 +24,7 @@ import org.junit.runners.Suite;
   ServerSessionContextTest.class,
   SSLUtilsTest.class,
   TestSessionBuilderTest.class,
+  VersionTest.class,
 })
 public class ConscryptOpenJdkSuite {
 

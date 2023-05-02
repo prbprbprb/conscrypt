@@ -1,9 +1,9 @@
 description = 'Conscrypt: Constants'
+import org.conscrypt.VersionCode
 
 ext {
     genDir = "${project.buildDir}/generated-sources"
 }
-
 
 sourceSets.main {
     java {
@@ -15,17 +15,17 @@ sourceSets.main {
 
 dependencies {
     implementation files("${genDir}") {
-        builtBy ':conscrypt-constants:runGen'
+        builtBy ':conscrypt-constants:generateAll'
     }
 }
 
 model {
     components {
         // Builds exe/ which generates the content of NativeConstants.java
-        gen(NativeExecutableSpec) {
+        generateNativeConstants(NativeExecutableSpec) {
             sources {
                 cpp {
-                    // Sources assumed to be in src/gen/cpp by default.
+                    // Sources assumed to be in src/generateNativeConstants/cpp by default.
                     exportedHeaders {
                         srcDirs "${boringsslIncludeDir}"
                         include "**/*.cc"
@@ -34,9 +34,7 @@ model {
             }
 
             binaries.all {
-                if (toolChain in VisualCpp) {
-                    cppCompiler.define "WIN32_LEAN_AND_MEAN"
-                } else if (toolChain in Clang || toolChain in Gcc) {
+                if (toolChain in Clang || toolChain in Gcc) {
                     cppCompiler.args "-std=c++17"
                 }
             }
@@ -44,19 +42,19 @@ model {
     }
 
     tasks {
-        // Runs generateNativeConstants to create build/NativeConstants.java
-        runGen(Exec) {
-            def gen = $.binaries.get("genExecutable")
+        // Runs generateNativeConstants to create build/generated-sources/NativeConstants.java
+        generateNativeConstants(Exec) {
+            def generator = $.binaries.get("generateNativeConstantsExecutable")
 
-            dependsOn gen
+            dependsOn generator
             outputs.dir genDir
-            File genDir = new File("${genDir}/org/conscrypt")
+            File output = new File("${genDir}/org/conscrypt")
 
-            executable gen.executable.file
+            executable generator.executable.file
 
             doFirst {
-                genDir.mkdirs()
-                standardOutput = new FileOutputStream(new File(genDir, "NativeConstants.java"))
+                output.mkdirs()
+                standardOutput = new FileOutputStream(new File(output, "NativeConstants.java"))
             }
             doLast {
                 if (standardOutput != null) {
@@ -67,5 +65,36 @@ model {
     }
 }
 
+tasks.register("generatePropertyConstants") {
+    doLast {
+        File output = new File("${genDir}/org/conscrypt")
+        output.mkdirs()
+        def outputStream = new FileOutputStream(new File(output, "PropertyConstants.java"))
+        outputStream << generatePropertyJavaCode()
+        outputStream.close();
+    }
+}
+
+tasks.register("generateAll") {
+    dependsOn 'generatePropertyConstants', 'generateNativeConstants'
+}
+
+String generatePropertyJavaCode() {
+    VersionCode version = project.property("parsedVersion")
+    String boringSslVersion = project.property("boringSslVersion")
+    String x = """// Generated code - do not edit!
+package org.conscrypt;
+
+// Generated constant properties - used instead of loading conscrypt.properties.
+class PropertyConstants {
+  public static final int VERSION_MAJOR = ${version.major};
+  public static final int VERSION_MINOR = ${version.minor};
+  public static final int VERSION_PATCH = ${version.patch};
+  public static final String VERSION_SUFFIX = "${version.suffix}";
+  public static final String BORINGSSL_VERSION = "${boringSslVersion}";
+}
+"""
+    return x
+}
 // Disable the javadoc task.
 tasks.withType(Javadoc).configureEach { enabled = false }
