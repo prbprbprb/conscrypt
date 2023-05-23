@@ -44,6 +44,7 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSession;
 import org.conscrypt.java.security.TestKeyStore;
 import org.junit.Test;
@@ -345,6 +346,23 @@ public class ConscryptEngineTest {
         doHandshake(true);
         assertNull(Conscrypt.getApplicationProtocol(clientEngine));
         assertNull(Conscrypt.getApplicationProtocol(serverEngine));
+    }
+
+    @Test
+    public void alpnServerProtocolNonNullIfNotInUse() throws Exception {
+        setupEngines(TestKeyStore.getClient(), TestKeyStore.getServer());
+
+        assertNull(Conscrypt.getApplicationProtocol(clientEngine));
+        assertNull(Conscrypt.getApplicationProtocol(serverEngine));
+
+        doHandshake(true);
+
+        SSLParameters params = clientEngine.getSSLParameters();
+        // String[] alpns = params.getApplicationProtocols();
+        // assertNull(alpns);
+        assertEquals("", Conscrypt.getApplicationProtocol(clientEngine));
+        assertEquals("", Conscrypt.getApplicationProtocol(serverEngine));
+
     }
 
     /**

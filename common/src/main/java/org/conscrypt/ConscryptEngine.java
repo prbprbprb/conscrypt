@@ -1004,6 +1004,13 @@ final class ConscryptEngine extends AbstractConscryptEngine implements NativeCry
 
     private void finishHandshake() throws SSLException {
         handshakeFinished = true;
+        String[] alpns = sslParameters.getApplicationProtocols();
+//        if (sslParameters.getApplicationProtocolSelector() == null
+//                && alpns != null && alpns.length == 0) {
+//            if (activeSession.getApplicationProtocol() == null) {
+//                activeSession.applicationProtocol = "";
+//            }
+//        }
         // Notify the listener, if provided.
         if (handshakeListener != null) {
             handshakeListener.onHandshakeFinished();

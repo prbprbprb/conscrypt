@@ -37,7 +37,7 @@ final class ActiveSession implements ConscryptSession {
     private byte[] id;
     private long creationTime;
     private String protocol;
-    private String applicationProtocol;
+    String applicationProtocol;
     private String peerHost;
     private int peerPort = -1;
     private long lastAccessedTime = 0;
