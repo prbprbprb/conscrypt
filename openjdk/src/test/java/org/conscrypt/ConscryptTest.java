@@ -27,6 +27,7 @@ import java.security.Provider;
 import java.security.Security;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.junit.Test;
@@ -67,14 +68,16 @@ public class ConscryptTest {
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(null, null, null);
             assertEquals(p, context.getProvider());
-            Set<String> expected = new HashSet<>(Arrays.asList("TLSv1.2", "TLSv1.1", "TLSv1"));
+            Set<String> expected = new HashSet<>();
+            expected.add("TLSv1.2");
+            addIfDefault(expected, "TLSv1.1");
+            addIfDefault(expected, "TLSv1");
             Set<String> found =
                 new HashSet<>(Arrays.asList(context.createSSLEngine().getEnabledProtocols()));
             assertEquals(expected, found);
 
             context = SSLContext.getInstance("Default");
             assertEquals(p, context.getProvider());
-            expected = new HashSet<>(Arrays.asList("TLSv1.2", "TLSv1.1", "TLSv1"));
             found = new HashSet<>(Arrays.asList(context.createSSLEngine().getEnabledProtocols()));
             assertEquals(expected, found);
         } finally {
@@ -95,15 +98,17 @@ public class ConscryptTest {
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(null, null, null);
             assertEquals(p, context.getProvider());
-            Set<String> expected =
-                new HashSet<>(Arrays.asList("TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1"));
+            Set<String> expected = new HashSet<>();
+            expected.add("TLSv1.3");
+            expected.add("TLSv1.2");
+            addIfDefault(expected, "TLSv1.1");
+            addIfDefault(expected, "TLSv1");
             Set<String> found =
                 new HashSet<>(Arrays.asList(context.createSSLEngine().getEnabledProtocols()));
             assertEquals(expected, found);
 
             context = SSLContext.getInstance("Default");
             assertEquals(p, context.getProvider());
-            expected = new HashSet<>(Arrays.asList("TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1"));
             found = new HashSet<>(Arrays.asList(context.createSSLEngine().getEnabledProtocols()));
             assertEquals(expected, found);
         } finally {
@@ -116,5 +121,16 @@ public class ConscryptTest {
             fail();
         } catch (IllegalArgumentException expected) {
         }
+    }
+
+    private void addIfDefault(Set<String> set, String protocol) {
+        if (isProtocolDefault(protocol)) {
+            set.add(protocol);
+        }
+    }
+
+    private boolean isProtocolDefault(String protocol) {
+        List<String> supported = Arrays.asList(NativeCrypto.getDefaultProtocols());
+        return supported.contains(protocol);
     }
 }

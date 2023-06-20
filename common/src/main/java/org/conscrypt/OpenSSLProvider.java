@@ -63,6 +63,12 @@ public final class OpenSSLProvider extends Provider {
         // Make sure the platform is initialized.
         Platform.setup();
 
+        // XXX
+        NativeCrypto.setDisabledProtocols(new String[] {
+            NativeCrypto.DEPRECATED_PROTOCOL_TLSV1,
+            NativeCrypto.DEPRECATED_PROTOCOL_TLSV1_1 });
+
+
         /* === SSL Contexts === */
         String classOpenSSLContextImpl = PREFIX + "OpenSSLContextImpl";
         String tls12SSLContextSuffix = "$TLSv12";

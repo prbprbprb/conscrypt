@@ -103,6 +103,7 @@ import org.junit.runners.Suite;
         AlgorithmParametersTestEC.class,
         AlgorithmParametersTestGCM.class,
         AlgorithmParametersTestOAEP.class,
+        ArrayUtilsTest.class,
         BufferUtilsTest.class,
         CipherSuiteTest.class,
         KeyFactoryTestDH.class,

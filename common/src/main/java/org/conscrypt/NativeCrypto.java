@@ -737,9 +737,9 @@ public final class NativeCrypto {
     // --- SSL handling --------------------------------------------------------
 
     static final String OBSOLETE_PROTOCOL_SSLV3 = "SSLv3";
-    private static final String SUPPORTED_PROTOCOL_TLSV1 = "TLSv1";
-    private static final String SUPPORTED_PROTOCOL_TLSV1_1 = "TLSv1.1";
-    private static final String SUPPORTED_PROTOCOL_TLSV1_2 = "TLSv1.2";
+    static final String DEPRECATED_PROTOCOL_TLSV1 = "TLSv1";
+    static final String DEPRECATED_PROTOCOL_TLSV1_1 = "TLSv1.1";
+    static final String SUPPORTED_PROTOCOL_TLSV1_2 = "TLSv1.2";
     static final String SUPPORTED_PROTOCOL_TLSV1_3 = "TLSv1.3";
 
     static final String[] SUPPORTED_TLS_1_3_CIPHER_SUITES = new String[] {
@@ -754,7 +754,7 @@ public final class NativeCrypto {
 
     // SUPPORTED_LEGACY_CIPHER_SUITES_SET contains all the supported cipher suites using the legacy
     // OpenSSL-style names.
-    private static final Set<String> SUPPORTED_LEGACY_CIPHER_SUITES_SET = new HashSet<String>();
+    static final Set<String> SUPPORTED_LEGACY_CIPHER_SUITES_SET = new HashSet<String>();
 
     static final Set<String> SUPPORTED_TLS_1_3_CIPHER_SUITES_SET = new HashSet<String>(
             Arrays.asList(SUPPORTED_TLS_1_3_CIPHER_SUITES));
@@ -972,36 +972,94 @@ public final class NativeCrypto {
     static native void set_SSL_psk_server_callback_enabled(long ssl, NativeSsl ssl_holder, boolean enabled);
 
     /** Protocols to enable by default when "TLSv1.3" is requested. */
-    static final String[] TLSV13_PROTOCOLS = new String[] {
-            SUPPORTED_PROTOCOL_TLSV1,
-            SUPPORTED_PROTOCOL_TLSV1_1,
-            SUPPORTED_PROTOCOL_TLSV1_2,
-            SUPPORTED_PROTOCOL_TLSV1_3,
+    private static final String[] TLSV13_PROTOCOLS = new String[] {
+        DEPRECATED_PROTOCOL_TLSV1,
+        DEPRECATED_PROTOCOL_TLSV1_1,
+        SUPPORTED_PROTOCOL_TLSV1_2,
+        SUPPORTED_PROTOCOL_TLSV1_3,
     };
 
     /** Protocols to enable by default when "TLSv1.2" is requested. */
-    static final String[] TLSV12_PROTOCOLS = new String[] {
-            SUPPORTED_PROTOCOL_TLSV1,
-            SUPPORTED_PROTOCOL_TLSV1_1,
-            SUPPORTED_PROTOCOL_TLSV1_2,
+    private static final String[] TLSV12_PROTOCOLS = new String[] {
+        DEPRECATED_PROTOCOL_TLSV1,
+        DEPRECATED_PROTOCOL_TLSV1_1,
+        SUPPORTED_PROTOCOL_TLSV1_2,
     };
 
     /** Protocols to enable by default when "TLSv1.1" is requested. */
-    static final String[] TLSV11_PROTOCOLS = TLSV12_PROTOCOLS;
+    private static final String[] TLSV11_PROTOCOLS = TLSV12_PROTOCOLS; // XXX
 
     /** Protocols to enable by default when "TLSv1" is requested. */
-    static final String[] TLSV1_PROTOCOLS = TLSV11_PROTOCOLS;
+    private static final String[] TLSV1_PROTOCOLS = TLSV11_PROTOCOLS;
 
-    static final String[] DEFAULT_PROTOCOLS = TLSV13_PROTOCOLS;
-    private static final String[] SUPPORTED_PROTOCOLS = new String[] {
-            SUPPORTED_PROTOCOL_TLSV1,
-            SUPPORTED_PROTOCOL_TLSV1_1,
-            SUPPORTED_PROTOCOL_TLSV1_2,
-            SUPPORTED_PROTOCOL_TLSV1_3,
-    };
+    private static final String[] ALL_PROTOCOLS = TLSV13_PROTOCOLS;
+
+    // All @GuardedBy(NativeCrypto.class)
+    private static Set<String> DEPRECATED_PROTOCOLS = new HashSet<>();
+    private static Set<String> DISABLED_PROTOCOLS = new HashSet<>();
+    private static String[] SUPPORTED_PROTOCOLS = TLSV13_PROTOCOLS; // XXX rename when all refs fixed
+    private static Set<String> SUPPORTED_PROTOCOL_SET = ArrayUtils.toSet(SUPPORTED_PROTOCOLS);
+    private static String[] DEFAULT_PROTOCOLS = TLSV13_PROTOCOLS;
+    private static Set<String> DEFAULT_PROTOCOL_SET = ArrayUtils.toSet(DEFAULT_PROTOCOLS);
+    private static Set<String> NON_DEFAULT_PROTOCOLS = new HashSet<>();
+
+    static void setDisabledProtocols(String[] disabledProtocols) {
+        synchronized (NativeCrypto.class) {
+            DISABLED_PROTOCOLS = ArrayUtils.toSet(disabledProtocols);
+            calculateActiveProtocols();
+        }
+    }
+    static void setDeprecatedProtocols(String[] deprecatedProtocols) {
+        synchronized (NativeCrypto.class) {
+            DEPRECATED_PROTOCOLS = ArrayUtils.toSet(deprecatedProtocols);
+            calculateActiveProtocols();
+        }
+    }
+    // Must be called with NativeCrypto.class lock held
+    private static void calculateActiveProtocols() {
+        SUPPORTED_PROTOCOLS = ArrayUtils.filter(ALL_PROTOCOLS, DISABLED_PROTOCOLS);
+        SUPPORTED_PROTOCOL_SET = ArrayUtils.toSet(SUPPORTED_PROTOCOLS);
+        // XXX Check for empty set and throw
+        DEFAULT_PROTOCOLS = ArrayUtils.filter(SUPPORTED_PROTOCOLS, DEPRECATED_PROTOCOLS);
+        DEFAULT_PROTOCOL_SET = ArrayUtils.toSet(DEFAULT_PROTOCOLS);
+        NON_DEFAULT_PROTOCOLS = new HashSet<>(DISABLED_PROTOCOLS);
+        NON_DEFAULT_PROTOCOLS.addAll(DEPRECATED_PROTOCOLS);
+    }
+
+    static String[] getTlsv1Protocols() {
+        synchronized (NativeCrypto.class) {
+            return ArrayUtils.filter(TLSV1_PROTOCOLS, NON_DEFAULT_PROTOCOLS);
+        }
+    }
+
+    static String[] getTlsv11Protocols() {
+        synchronized (NativeCrypto.class) {
+            return ArrayUtils.filter(TLSV11_PROTOCOLS, NON_DEFAULT_PROTOCOLS);
+        }
+    }
+
+    static String[] getTlsv12Protocols() {
+        synchronized (NativeCrypto.class) {
+            return ArrayUtils.filter(TLSV12_PROTOCOLS, NON_DEFAULT_PROTOCOLS);
+        }
+    }
+
+    static String[] getTlsv13Protocols() {
+        synchronized (NativeCrypto.class) {
+            return ArrayUtils.filter(TLSV13_PROTOCOLS, NON_DEFAULT_PROTOCOLS);
+        }
+    }
 
     static String[] getSupportedProtocols() {
-        return SUPPORTED_PROTOCOLS.clone();
+        synchronized (NativeCrypto.class) {
+            return SUPPORTED_PROTOCOLS.clone();
+        }
+    }
+
+    static String[] getDefaultProtocols() {
+        synchronized (NativeCrypto.class) {
+            return DEFAULT_PROTOCOLS.clone();
+        }
     }
 
     private static class Range {
@@ -1047,9 +1105,9 @@ public final class NativeCrypto {
     }
 
     private static int getProtocolConstant(String protocol) {
-        if (protocol.equals(SUPPORTED_PROTOCOL_TLSV1)) {
+        if (protocol.equals(DEPRECATED_PROTOCOL_TLSV1)) {
             return NativeConstants.TLS1_VERSION;
-        } else if (protocol.equals(SUPPORTED_PROTOCOL_TLSV1_1)) {
+        } else if (protocol.equals(DEPRECATED_PROTOCOL_TLSV1_1)) {
             return NativeConstants.TLS1_1_VERSION;
         } else if (protocol.equals(SUPPORTED_PROTOCOL_TLSV1_2)) {
             return NativeConstants.TLS1_2_VERSION;
@@ -1064,16 +1122,14 @@ public final class NativeCrypto {
         if (protocols == null) {
             throw new IllegalArgumentException("protocols == null");
         }
-        for (String protocol : protocols) {
-            if (protocol == null) {
-                throw new IllegalArgumentException("protocols contains null");
-            }
-            if (!protocol.equals(SUPPORTED_PROTOCOL_TLSV1)
-                    && !protocol.equals(SUPPORTED_PROTOCOL_TLSV1_1)
-                    && !protocol.equals(SUPPORTED_PROTOCOL_TLSV1_2)
-                    && !protocol.equals(SUPPORTED_PROTOCOL_TLSV1_3)
-                    && !protocol.equals(OBSOLETE_PROTOCOL_SSLV3)) {
-                throw new IllegalArgumentException("protocol " + protocol + " is not supported");
+        synchronized (NativeCrypto.class) {
+            for (String protocol : protocols) {
+                if (protocol == null) {
+                    throw new IllegalArgumentException("protocols contains null");
+                }
+                if (!SUPPORTED_PROTOCOL_SET.contains(protocol)) {
+                    throw new IllegalArgumentException("protocol " + protocol + " is not supported");
+                }
             }
         }
         return protocols;
@@ -1102,8 +1158,8 @@ public final class NativeCrypto {
             // problems when servers upgrade.  See https://github.com/google/conscrypt/issues/574
             // for more discussion.
             if (cipherSuite.equals(TLS_FALLBACK_SCSV)
-                    && (maxProtocol.equals(SUPPORTED_PROTOCOL_TLSV1)
-                        || maxProtocol.equals(SUPPORTED_PROTOCOL_TLSV1_1))) {
+                    && (maxProtocol.equals(DEPRECATED_PROTOCOL_TLSV1)
+                        || maxProtocol.equals(DEPRECATED_PROTOCOL_TLSV1_1))) {
                 SSL_set_mode(ssl, ssl_holder, NativeConstants.SSL_MODE_SEND_FALLBACK_SCSV);
                 continue;
             }

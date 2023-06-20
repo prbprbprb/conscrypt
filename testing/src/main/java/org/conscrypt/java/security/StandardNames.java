@@ -105,8 +105,24 @@ public final class StandardNames {
     private static final HashMap<String, HashSet<String>> CIPHER_PADDINGS =
             new HashMap<String, HashSet<String>>();
 
-    private static final HashMap<String, String[]> SSL_CONTEXT_PROTOCOLS_ENABLED =
+    private static HashMap<String, String[]> SSL_CONTEXT_PROTOCOLS_ENABLED =
             new HashMap<String, String[]>();
+    private static Set<String> SSL_PROTOCOLS_DEPRECATED = new HashSet<>();
+    private static Set<String> SSL_PROTOCOLS_DISABLED = new HashSet<>();
+
+    public static void setDeprecatedProtocols(String... protocols) {
+        SSL_PROTOCOLS_DEPRECATED = new HashSet<>(Arrays.asList(protocols));
+        provideSslContexts();
+    }
+
+    public static void setDisabledProtocols(String... protocols) {
+        SSL_PROTOCOLS_DISABLED = new HashSet<>(Arrays.asList(protocols));
+        provideSslContexts();
+        SSL_SOCKET_PROTOCOLS = new HashSet<>(ALL_SSL_SOCKET_PROTOCOLS);
+        SSL_SOCKET_PROTOCOLS.removeAll(SSL_PROTOCOLS_DISABLED);
+        System.out.println("foo");
+    }
+
 
     private static void provideCipherModes(String algorithm, String newModes[]) {
         HashSet<String> modes = CIPHER_MODES.get(algorithm);
@@ -129,6 +145,12 @@ public final class StandardNames {
         if (minimum.ordinal() > maximum.ordinal()) {
             throw new RuntimeException("TLS version: minimum > maximum");
         }
+        while (SSL_PROTOCOLS_DEPRECATED.contains(minimum.name)) {
+            minimum = TLSVersion.values()[minimum.ordinal() + 1];
+        }
+        while (SSL_PROTOCOLS_DISABLED.contains(minimum.name)) {
+            minimum = TLSVersion.values()[minimum.ordinal() + 1];
+        }
         int versionsLength = maximum.ordinal() - minimum.ordinal() + 1;
         String[] versionNames = new String[versionsLength];
         for (int i = 0; i < versionsLength; i++) {
@@ -136,6 +158,7 @@ public final class StandardNames {
         }
         SSL_CONTEXT_PROTOCOLS_ENABLED.put(algorithm, versionNames);
     }
+
     static {
         // TODO: provideCipherModes and provideCipherPaddings for other Ciphers
         provideCipherModes("AES", new String[] {"CBC", "CFB", "CTR", "CTS", "ECB", "OFB"});
@@ -149,7 +172,11 @@ public final class StandardNames {
         if (!IS_RI) {
             provideCipherPaddings("AES", new String[] {"PKCS7Padding"});
         }
+        provideSslContexts();
+    }
 
+    private static void provideSslContexts() {
+        SSL_CONTEXT_PROTOCOLS_ENABLED = new HashMap<>();
         provideSslContextEnabledProtocols("TLS", TLSVersion.TLSv1, TLSVersion.TLSv13);
         provideSslContextEnabledProtocols("TLSv1", TLSVersion.TLSv1, TLSVersion.TLSv12);
         provideSslContextEnabledProtocols("TLSv1.1", TLSVersion.TLSv1, TLSVersion.TLSv12);
@@ -164,6 +191,7 @@ public final class StandardNames {
     public static final Set<String> SSL_CONTEXT_PROTOCOLS_WITH_DEFAULT_CONFIG = new HashSet<String>(
             Arrays.asList(SSL_CONTEXT_PROTOCOLS_DEFAULT, "TLS", "TLSv1.3"));
 
+
     public static final Set<String> KEY_TYPES = new HashSet<String>(
             Arrays.asList("RSA", "DSA", "DH_RSA", "DH_DSA", "EC", "EC_EC", "EC_RSA"));
     static {
@@ -174,8 +202,9 @@ public final class StandardNames {
         }
     }
 
-    public static final Set<String> SSL_SOCKET_PROTOCOLS =
-            new HashSet<String>(Arrays.asList("TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"));
+    private static final List<String> ALL_SSL_SOCKET_PROTOCOLS =
+        Arrays.asList("TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3");
+    public static Set<String> SSL_SOCKET_PROTOCOLS = new HashSet<String>(ALL_SSL_SOCKET_PROTOCOLS);
 
     private enum TLSVersion {
         SSLv3("SSLv3"),
@@ -456,6 +485,10 @@ public final class StandardNames {
         assertEquals("For protocol \"" + version + "\"",
                 Arrays.toString(SSL_CONTEXT_PROTOCOLS_ENABLED.get(version)),
                 Arrays.toString(protocols));
+    }
+
+    public static String[] expectedSSLContextEnabledProtocols(String version) {
+        return SSL_CONTEXT_PROTOCOLS_ENABLED.get(version);
     }
 
     /**

@@ -45,6 +45,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,10 +75,10 @@ public final class TestUtils {
     private static final String PROTOCOL_TLS_V1_1 = "TLSv1.1";
     private static final String PROTOCOL_TLS_V1 = "TLSv1";
     private static final String[] DESIRED_PROTOCOLS =
-        new String[] {PROTOCOL_TLS_V1_2, PROTOCOL_TLS_V1_1, PROTOCOL_TLS_V1};
+        new String[]{PROTOCOL_TLS_V1_2, PROTOCOL_TLS_V1_1, PROTOCOL_TLS_V1};
     private static final Provider JDK_PROVIDER = getNonConscryptTlsProvider();
     private static final byte[] CHARS =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".getBytes(UTF_8);
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".getBytes(UTF_8);
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocateDirect(0);
     private static final String[] PROTOCOLS = getProtocolsInternal();
 
@@ -97,6 +98,7 @@ public final class TestUtils {
             }
         };
         private static final Random random = new Random(System.currentTimeMillis());
+
         abstract ByteBuffer newBuffer(int size);
 
         public ByteBuffer[] newRandomBuffers(int... sizes) {
@@ -118,13 +120,14 @@ public final class TestUtils {
         }
     }
 
-    private TestUtils() {}
+    private TestUtils() {
+    }
 
     private static Provider getNonConscryptTlsProvider() {
         for (String protocol : DESIRED_PROTOCOLS) {
             for (Provider p : Security.getProviders()) {
                 if (!p.getClass().getPackage().getName().contains("conscrypt")
-                        && hasProtocol(p, protocol)) {
+                    && hasProtocol(p, protocol)) {
                     return p;
                 }
             }
@@ -152,7 +155,7 @@ public final class TestUtils {
 
     private static void assumeClassAvailable(String classname) {
         Assume.assumeTrue("Skipping test: " + classname + " unavailable",
-                isClassAvailable(classname));
+            isClassAvailable(classname));
     }
 
     public static void assumeSNIHostnameAvailable() {
@@ -176,7 +179,7 @@ public final class TestUtils {
             // Ignored
         }
         Assume.assumeTrue("Skipping test: "
-                + "SSLParameters.setEndpointIdentificationAlgorithm unavailable", supported);
+            + "SSLParameters.setEndpointIdentificationAlgorithm unavailable", supported);
     }
 
     public static void assumeAEADAvailable() {
@@ -200,7 +203,7 @@ public final class TestUtils {
     public static void assumeAllowsUnsignedCrypto() {
         // The Oracle JRE disallows loading crypto providers from unsigned jars
         Assume.assumeTrue(isAndroid()
-                || !System.getProperty("java.vm.name").contains("HotSpot"));
+            || !System.getProperty("java.vm.name").contains("HotSpot"));
     }
 
     public static void assumeSHA2WithDSAAvailable() {
@@ -267,21 +270,21 @@ public final class TestUtils {
     }
 
     public static PublicKey readPublicKeyPemFile(String name)
-            throws InvalidKeySpecException, NoSuchAlgorithmException, IOException {
+        throws InvalidKeySpecException, NoSuchAlgorithmException, IOException {
         String keyData = new String(readTestFile(name), StandardCharsets.US_ASCII);
         keyData = keyData.replace("-----BEGIN PUBLIC KEY-----", "");
         keyData = keyData.replace("-----END PUBLIC KEY-----", "");
         keyData = keyData.replace("\r", "");
         keyData = keyData.replace("\n", "");
         return KeyFactory.getInstance("EC").generatePublic(
-                new X509EncodedKeySpec(decodeBase64(keyData)));
+            new X509EncodedKeySpec(decodeBase64(keyData)));
     }
 
     public static List<String[]> readCsvResource(String resourceName) throws IOException {
         InputStream stream = openTestFile(resourceName);
         List<String[]> lines = new ArrayList<>();
         try (BufferedReader reader
-                     = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                 = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty() || line.startsWith("#")) {
@@ -298,7 +301,7 @@ public final class TestUtils {
      */
     public static Class<?> conscryptClass(String simpleName) throws ClassNotFoundException {
         ClassNotFoundException ex = null;
-        for (String packageName : new String[] {"org.conscrypt", "com.android.org.conscrypt"}) {
+        for (String packageName : new String[]{"org.conscrypt", "com.android.org.conscrypt"}) {
             String name = packageName + "." + simpleName;
             try {
                 return Class.forName(name);
@@ -327,11 +330,11 @@ public final class TestUtils {
     }
 
     static SSLSocketFactory setUseEngineSocket(
-            SSLSocketFactory conscryptFactory, boolean useEngineSocket) {
+        SSLSocketFactory conscryptFactory, boolean useEngineSocket) {
         try {
             Class<?> clazz = conscryptClass("Conscrypt");
             Method method =
-                    clazz.getMethod("setUseEngineSocket", SSLSocketFactory.class, boolean.class);
+                clazz.getMethod("setUseEngineSocket", SSLSocketFactory.class, boolean.class);
             method.invoke(null, conscryptFactory, useEngineSocket);
             return conscryptFactory;
         } catch (Exception e) {
@@ -340,11 +343,11 @@ public final class TestUtils {
     }
 
     static SSLServerSocketFactory setUseEngineSocket(
-            SSLServerSocketFactory conscryptFactory, boolean useEngineSocket) {
+        SSLServerSocketFactory conscryptFactory, boolean useEngineSocket) {
         try {
             Class<?> clazz = conscryptClass("Conscrypt");
             Method method = clazz.getMethod(
-                    "setUseEngineSocket", SSLServerSocketFactory.class, boolean.class);
+                "setUseEngineSocket", SSLServerSocketFactory.class, boolean.class);
             method.invoke(null, conscryptFactory, useEngineSocket);
             return conscryptFactory;
         } catch (Exception e) {
@@ -395,9 +398,9 @@ public final class TestUtils {
 
     static String[] getCommonCipherSuites() {
         SSLContext jdkContext =
-                TestUtils.initSslContext(newContext(getJdkProvider()), TestKeyStore.getClient());
+            TestUtils.initSslContext(newContext(getJdkProvider()), TestKeyStore.getClient());
         SSLContext conscryptContext = TestUtils.initSslContext(
-                newContext(getConscryptProvider()), TestKeyStore.getClient());
+            newContext(getConscryptProvider()), TestKeyStore.getClient());
         Set<String> supported = new LinkedHashSet<>(supportedCiphers(jdkContext));
         supported.retainAll(supportedCiphers(conscryptContext));
         filterCiphers(supported);
@@ -415,7 +418,7 @@ public final class TestUtils {
         while (iter.hasNext()) {
             String cipher = iter.next();
             if (cipher.startsWith("SSL_") || cipher.startsWith("TLS_EMPTY")
-                    || cipher.contains("_RC4_")) {
+                || cipher.contains("_RC4_")) {
                 iter.remove();
             }
         }
@@ -443,7 +446,7 @@ public final class TestUtils {
      */
     public static byte[] newTextMessage(int length) {
         byte[] msg = new byte[length];
-        for (int msgIndex = 0; msgIndex < length;) {
+        for (int msgIndex = 0; msgIndex < length; ) {
             int remaining = length - msgIndex;
             int numChars = Math.min(remaining, CHARS.length);
             System.arraycopy(CHARS, 0, msg, msgIndex, numChars);
@@ -492,8 +495,8 @@ public final class TestUtils {
      * Performs the initial TLS handshake between the two {@link SSLEngine} instances.
      */
     public static void doEngineHandshake(SSLEngine clientEngine, SSLEngine serverEngine,
-        ByteBuffer clientAppBuffer, ByteBuffer clientPacketBuffer, ByteBuffer serverAppBuffer,
-        ByteBuffer serverPacketBuffer, boolean beginHandshake) throws SSLException {
+                                         ByteBuffer clientAppBuffer, ByteBuffer clientPacketBuffer, ByteBuffer serverAppBuffer,
+                                         ByteBuffer serverPacketBuffer, boolean beginHandshake) throws SSLException {
         if (beginHandshake) {
             clientEngine.beginHandshake();
             serverEngine.beginHandshake();
@@ -573,7 +576,7 @@ public final class TestUtils {
 
     private static void runDelegatedTasks(SSLEngineResult result, SSLEngine engine) {
         if (result.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NEED_TASK) {
-            for (;;) {
+            for (; ; ) {
                 Runnable task = engine.getDelegatedTask();
                 if (task == null) {
                     break;
@@ -600,7 +603,7 @@ public final class TestUtils {
     /**
      * Decodes the provided hexadecimal string into a byte array.  Odd-length inputs
      * are not allowed.
-     *
+     * <p>
      * Throws an {@code IllegalArgumentException} if the input is malformed.
      */
     public static byte[] decodeHex(String encoded) throws IllegalArgumentException {
@@ -611,7 +614,7 @@ public final class TestUtils {
      * Decodes the provided hexadecimal string into a byte array. If {@code allowSingleChar}
      * is {@code true} odd-length inputs are allowed and the first character is interpreted
      * as the lower bits of the first result byte.
-     *
+     * <p>
      * Throws an {@code IllegalArgumentException} if the input is malformed.
      */
     public static byte[] decodeHex(String encoded, boolean allowSingleChar) throws IllegalArgumentException {
@@ -621,7 +624,7 @@ public final class TestUtils {
     /**
      * Decodes the provided hexadecimal string into a byte array.  Odd-length inputs
      * are not allowed.
-     *
+     * <p>
      * Throws an {@code IllegalArgumentException} if the input is malformed.
      */
     public static byte[] decodeHex(char[] encoded) throws IllegalArgumentException {
@@ -632,7 +635,7 @@ public final class TestUtils {
      * Decodes the provided hexadecimal string into a byte array. If {@code allowSingleChar}
      * is {@code true} odd-length inputs are allowed and the first character is interpreted
      * as the lower bits of the first result byte.
-     *
+     * <p>
      * Throws an {@code IllegalArgumentException} if the input is malformed.
      */
     public static byte[] decodeHex(char[] encoded, boolean allowSingleChar) throws IllegalArgumentException {
@@ -674,7 +677,7 @@ public final class TestUtils {
         }
 
         throw new IllegalArgumentException("Illegal char: " + str[offset] +
-                " at offset " + offset);
+            " at offset " + offset);
     }
 
     private static final char[] HEX_CHARS = "0123456789abcdef".toCharArray();
@@ -690,7 +693,7 @@ public final class TestUtils {
     }
 
     private static final String BASE64_ALPHABET =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     public static String encodeBase64(byte[] data) {
         // Base64 was introduced in Java 8, so if it's not available we can use a hacky
@@ -702,8 +705,8 @@ public final class TestUtils {
             for (int i = 0; i < data.length; i += 3) {
                 int padding = (i + 2 < data.length) ? 0 : (i + 3 - data.length);
                 byte b1 = data[i];
-                byte b2 = padding >= 2 ? 0 : data[i+1];
-                byte b3 = padding >= 1 ? 0 : data[i+2];
+                byte b2 = padding >= 2 ? 0 : data[i + 1];
+                byte b3 = padding >= 1 ? 0 : data[i + 2];
 
                 char c1 = BASE64_ALPHABET.charAt((b1 & 0xFF) >>> 2);
                 char c2 = BASE64_ALPHABET.charAt(((b1 & 0x03) << 4) | ((b2 & 0xFF) >>> 4));
@@ -736,16 +739,16 @@ public final class TestUtils {
             int outputindex = 0;
             for (int i = 0; i < data.length(); i += 4) {
                 char c1 = data.charAt(i);
-                char c2 = data.charAt(i+1);
-                char c3 = (i+2 < data.length()) ? data.charAt(i+2) : 'A';
-                char c4 = (i+3 < data.length()) ? data.charAt(i+3) : 'A';
+                char c2 = data.charAt(i + 1);
+                char c3 = (i + 2 < data.length()) ? data.charAt(i + 2) : 'A';
+                char c4 = (i + 3 < data.length()) ? data.charAt(i + 3) : 'A';
 
                 byte b1 = (byte)
-                        (BASE64_ALPHABET.indexOf(c1) << 2 | BASE64_ALPHABET.indexOf(c2) >>> 4);
+                    (BASE64_ALPHABET.indexOf(c1) << 2 | BASE64_ALPHABET.indexOf(c2) >>> 4);
                 byte b2 = (byte)
-                        ((BASE64_ALPHABET.indexOf(c2) & 0x0F) << 4 | BASE64_ALPHABET.indexOf(c3) >>> 2);
+                    ((BASE64_ALPHABET.indexOf(c2) & 0x0F) << 4 | BASE64_ALPHABET.indexOf(c3) >>> 2);
                 byte b3 = (byte)
-                        ((BASE64_ALPHABET.indexOf(c3) & 0x03) << 6 | BASE64_ALPHABET.indexOf(c4));
+                    ((BASE64_ALPHABET.indexOf(c3) & 0x03) << 6 | BASE64_ALPHABET.indexOf(c4));
 
                 output[outputindex++] = b1;
                 if (outputindex < output.length) {
@@ -794,5 +797,25 @@ public final class TestUtils {
     public static boolean isOsx() {
         String name = osName();
         return name.startsWith("macosx") || name.startsWith("osx");
+    }
+
+    public static void assumeTlsV1() {
+        Assume.assumeTrue(protocolIsSupported("TLSv1"));
+    }
+
+    public static void assumeTlsV1_1() {
+        Assume.assumeTrue(protocolIsSupported("TLSv1.1"));
+    }
+
+    private static boolean protocolIsSupported(String protocol) {
+        try {
+            String[] protoArray = (String[]) conscryptClass("NativeCrypto")
+                .getDeclaredMethod("getSupportedProtocols")
+                .invoke(null);
+            Set<String> supported = new HashSet<>(Arrays.asList(protoArray));
+            return supported.contains(protocol);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

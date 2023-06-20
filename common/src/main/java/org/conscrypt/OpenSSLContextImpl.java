@@ -161,7 +161,7 @@ public abstract class OpenSSLContextImpl extends SSLContextSpi {
      */
     public static final class TLSv13 extends OpenSSLContextImpl {
         public TLSv13() {
-            super(NativeCrypto.TLSV13_PROTOCOLS);
+            super(NativeCrypto.getTlsv13Protocols());
         }
     }
 
@@ -170,7 +170,7 @@ public abstract class OpenSSLContextImpl extends SSLContextSpi {
      */
     public static final class TLSv12 extends OpenSSLContextImpl {
         public TLSv12() {
-            super(NativeCrypto.TLSV12_PROTOCOLS);
+            super(NativeCrypto.getTlsv12Protocols());
         }
     }
 
@@ -179,7 +179,7 @@ public abstract class OpenSSLContextImpl extends SSLContextSpi {
      */
     public static final class TLSv11 extends OpenSSLContextImpl {
         public TLSv11() {
-            super(NativeCrypto.TLSV11_PROTOCOLS);
+            super(NativeCrypto.getTlsv11Protocols());
         }
     }
 
@@ -188,7 +188,7 @@ public abstract class OpenSSLContextImpl extends SSLContextSpi {
      */
     public static final class TLSv1 extends OpenSSLContextImpl {
         public TLSv1() {
-            super(NativeCrypto.TLSV1_PROTOCOLS);
+            super(NativeCrypto.getTlsv1Protocols());
         }
     }
 }

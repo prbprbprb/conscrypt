@@ -16,6 +16,12 @@
 
 package org.conscrypt;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 /**
  * Compatibility utility for Arrays.
  */
@@ -31,5 +37,25 @@ final class ArrayUtils {
             throw new ArrayIndexOutOfBoundsException("length=" + arrayLength + "; regionStart="
                     + offset + "; regionLength=" + count);
         }
+    }
+
+    // Set.of only available in Java 9+ and Android API 30+.
+    @SafeVarargs
+    static <T> Set<T> toSet(T... array) {
+        Set<T> result = new HashSet<>(array.length);
+        result.addAll(Arrays.asList(array));
+        return result;
+    }
+
+    // Returns a new String array with unwanted values filtered out.
+    // XXX Optimise
+    static String[] filter(String[] input, Set<String> toFilter) {
+        List<String> result = new ArrayList<>(Arrays.asList(input));
+        result.removeAll(toFilter);
+        return result.toArray(new String[0]);
+    }
+
+    static String[] filter(String[] input, String... toFilter) {
+        return filter(input, toSet(toFilter));
     }
 }

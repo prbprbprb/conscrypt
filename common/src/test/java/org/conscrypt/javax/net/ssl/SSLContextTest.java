@@ -64,6 +64,7 @@ import javax.net.ssl.X509KeyManager;
 import junit.framework.AssertionFailedError;
 import org.conscrypt.TestUtils;
 import org.conscrypt.java.security.StandardNames;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -71,6 +72,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SSLContextTest {
 
+    @Before
+    public void before() {
+        StandardNames.setDisabledProtocols("TLSv1", "TLSv1.1");
+    }
     @Test
     public void test_SSLContext_getDefault() throws Exception {
         SSLContext sslContext = SSLContext.getDefault();

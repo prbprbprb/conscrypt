@@ -25,6 +25,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -60,6 +61,8 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
+
+import org.conscrypt.NativeCrypto;
 import org.conscrypt.TestUtils;
 import org.conscrypt.java.security.StandardNames;
 import org.conscrypt.java.security.TestKeyStore;
@@ -382,6 +385,8 @@ public class SSLSocketTest {
      */
     @Test
     public void test_SSLSocket_noncontiguousProtocols_useLower() throws Exception {
+        TestUtils.assumeTlsV1_1();
+
         TestSSLContext c = TestSSLContext.create();
         SSLContext clientContext = c.clientContext;
         SSLSocket client = (SSLSocket)
@@ -411,6 +416,8 @@ public class SSLSocketTest {
      */
     @Test
     public void test_SSLSocket_noncontiguousProtocols_canNegotiate() throws Exception {
+        TestUtils.assumeTlsV1_1();
+
         TestSSLContext c = TestSSLContext.create();
         SSLContext clientContext = c.clientContext;
         SSLSocket client = (SSLSocket)
@@ -925,6 +932,7 @@ public class SSLSocketTest {
     // Confirms that communication without the TLS_FALLBACK_SCSV cipher works as it always did.
     @Test
     public void test_SSLSocket_sendsNoTlsFallbackScsv_Fallback_Success() throws Exception {
+        TestUtils.assumeTlsV1_1();
         TestSSLContext context = TestSSLContext.create();
         final SSLSocket client = (SSLSocket) context.clientContext.getSocketFactory().createSocket(
                 context.host, context.port);
@@ -958,6 +966,7 @@ public class SSLSocketTest {
     @Test
     public void test_SSLSocket_sendsTlsFallbackScsv_InappropriateFallback_Failure()
             throws Exception {
+        TestUtils.assumeTlsV1_1();
         TestSSLContext context = TestSSLContext.create();
         final SSLSocket client = (SSLSocket) context.clientContext.getSocketFactory().createSocket(
                 context.host, context.port);
