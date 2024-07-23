@@ -82,7 +82,7 @@ if (androidSdkInstalled) {
         sourceSets.main {
             java {
                 srcDirs = [
-                        "${rootDir}/common/src/main/java",
+                        // "${rootDir}/common/src/main/java",
                         "src/main/java"
                 ]
                 // Requires evaluationDependsOn(':conscrypt-constants') above.

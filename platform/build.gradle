@@ -69,7 +69,7 @@ if (androidSdkInstalled) {
             main {
                 java {
                     srcDirs = [
-                            "${rootDir}/common/src/main/java",
+                            // "${rootDir}/common/src/main/java",
                             "src/main/java",
                     ]
                     excludes = [ 'org/conscrypt/Platform.java' ]
