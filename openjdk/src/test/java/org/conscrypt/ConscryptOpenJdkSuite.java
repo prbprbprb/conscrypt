@@ -108,6 +108,7 @@ import org.junit.runners.Suite;
         OpenSSLKeyTest.class,
         OpenSSLX509CertificateTest.class,
         PlatformTest.class,
+        ClassProxyTest.class,
         SSLUtilsTest.class,
         ServerSessionContextTest.class,
         TestSessionBuilderTest.class,

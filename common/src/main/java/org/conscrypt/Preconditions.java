@@ -52,6 +52,18 @@ final class Preconditions {
     }
 
     /**
+     * Ensures the truth of an expression involving a method's preconditions.
+     *
+     * @param condition to condition to be tested
+     * @param errorMessage the exception message to use if the check fails.
+     * @throws IllegalStateException if the condition is {@code false}
+     */
+    static void checkState(boolean condition, String errorMessage) {
+        if (!condition) {
+            throw new IllegalStateException(errorMessage);
+        }
+    }
+    /**
      * Ensures the truth of an expression involving one or more parameters to the calling method.
      *
      * @param condition to condition to be tested

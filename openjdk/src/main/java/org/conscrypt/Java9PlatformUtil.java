@@ -16,81 +16,67 @@
 
 package org.conscrypt;
 
-import java.lang.reflect.Method;
 import javax.net.ssl.SSLParameters;
 
 /**
  * Utility methods supported on Java 9+.
  */
 final class Java9PlatformUtil {
-    // TODO(nmittler): Remove reflection once we require Java 9 for building.
-    private static final Method SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD;
-    private static final Method SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD;
+    static final class SSLParametersProxy extends ClassProxy {
+        private static class Holder {
+            private  static final SSLParametersProxy INSTANCE = new SSLParametersProxy();
+        }
+        private final MethodProxy getApplicationProtocols;
+        private final MethodProxy setApplicationProtocols;
 
-    static {
-        Class<?> sslParameters = SSLParameters.class;
-        Method getApplicationProtocolsMethod;
-        Method setApplicationProtocolsMethod;
-        try {
-            getApplicationProtocolsMethod = sslParameters.getMethod("getApplicationProtocols");
-            setApplicationProtocolsMethod =
-                    sslParameters.getMethod("setApplicationProtocols", String[].class);
-        } catch (NoSuchMethodException e) {
-            getApplicationProtocolsMethod = null;
-            setApplicationProtocolsMethod = null;
+        SSLParametersProxy() {
+            super(SSLParameters.class);
+            getApplicationProtocols = getMethod("getApplicationProtocols")
+                    .setReturnType(String[].class)
+                    .setDefaultValue(EmptyArray.STRING);
+            setApplicationProtocols =
+                    getMethod("setApplicationProtocols", String[].class);
         }
 
-        SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD = getApplicationProtocolsMethod;
-        SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD = setApplicationProtocolsMethod;
+        public String[] getApplicationProtocols(SSLParameters params) {
+            return (String[]) getApplicationProtocols.invoke(params);
+        }
+
+        public void setApplicationProtocols(SSLParameters params, String[] protocols) {
+            setApplicationProtocols.invoke(params, (Object) protocols);
+        }
+
+        static SSLParametersProxy get() {
+            return Holder.INSTANCE;
+        }
     }
 
     static void setSSLParameters(
             SSLParameters src, SSLParametersImpl dest, AbstractConscryptSocket socket) {
         Java8PlatformUtil.setSSLParameters(src, dest, socket);
 
-        dest.setApplicationProtocols(getApplicationProtocols(src));
+        dest.setApplicationProtocols(SSLParametersProxy.get().getApplicationProtocols(src));
     }
 
     static void getSSLParameters(
             SSLParameters dest, SSLParametersImpl src, AbstractConscryptSocket socket) {
         Java8PlatformUtil.getSSLParameters(dest, src, socket);
 
-        setApplicationProtocols(dest, src.getApplicationProtocols());
+        SSLParametersProxy.get().setApplicationProtocols(dest, src.getApplicationProtocols());
     }
 
     static void setSSLParameters(
             SSLParameters src, SSLParametersImpl dest, ConscryptEngine engine) {
         Java8PlatformUtil.setSSLParameters(src, dest, engine);
 
-        dest.setApplicationProtocols(getApplicationProtocols(src));
+        dest.setApplicationProtocols(SSLParametersProxy.get().getApplicationProtocols(src));
     }
 
     static void getSSLParameters(
             SSLParameters dest, SSLParametersImpl src, ConscryptEngine engine) {
         Java8PlatformUtil.getSSLParameters(dest, src, engine);
 
-        setApplicationProtocols(dest, src.getApplicationProtocols());
-    }
-
-    private static String[] getApplicationProtocols(SSLParameters params) {
-        if (SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD != null) {
-            try {
-                return (String[]) SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD.invoke(params);
-            } catch (ReflectiveOperationException ignored) {
-                // TODO(nmittler): Should we throw here?
-            }
-        }
-        return EmptyArray.STRING;
-    }
-
-    private static void setApplicationProtocols(SSLParameters params, String[] protocols) {
-        if (SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD != null) {
-            try {
-                SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD.invoke(params, (Object) protocols);
-            } catch (ReflectiveOperationException ignored) {
-                // TODO(nmittler): Should we throw here?
-            }
-        }
+        SSLParametersProxy.get().setApplicationProtocols(dest, src.getApplicationProtocols());
     }
 
     private Java9PlatformUtil() {}

@@ -22,7 +22,6 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
-import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +32,7 @@ import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIMatcher;
 import javax.net.ssl.SNIServerName;
 import javax.net.ssl.SSLParameters;
+import org.conscrypt.Java9PlatformUtil.SSLParametersProxy;
 import org.conscrypt.testing.FailingSniMatcher;
 import org.conscrypt.testing.RestrictedAlgorithmConstraints;
 import org.junit.Test;
@@ -44,40 +44,22 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class PlatformTest {
-    private static final Method SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD;
-    private static final Method SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD;
-
-    static {
-        Class<?> sslParameters = SSLParameters.class;
-        Method getApplicationProtocolsMethod;
-        Method setApplicationProtocolsMethod;
-        try {
-            getApplicationProtocolsMethod = sslParameters.getMethod("getApplicationProtocols");
-            setApplicationProtocolsMethod =
-                sslParameters.getMethod("setApplicationProtocols", String[].class);
-        } catch (NoSuchMethodException e) {
-            getApplicationProtocolsMethod = null;
-            setApplicationProtocolsMethod = null;
-        }
-
-        SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD = getApplicationProtocolsMethod;
-        SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD = setApplicationProtocolsMethod;
-    }
+    private final SSLParametersProxy sslParamProxy = SSLParametersProxy.get();
 
     @Test
     public void test_setSSLParameters_Socket() throws Exception {
-        assumeJava8();
         Socket socket = new OpenSSLSocketFactoryImpl().createSocket();
         SSLParametersImpl impl = SSLParametersImpl.getDefault();
         SSLParameters params = new SSLParameters();
-        List<SNIServerName> names = new ArrayList<SNIServerName>();
+        List<SNIServerName> names = new ArrayList<>();
         names.add(new SNIHostName("some.host"));
         params.setServerNames(names);
         params.setUseCipherSuitesOrder(false);
         params.setEndpointIdentificationAlgorithm("ABC");
         String[] applicationProtocols = new String[] {"foo", "bar"};
         if (isJavaVersion(9)) {
-            setApplicationProtocols(params, applicationProtocols);
+            assertArrayEquals(EmptyArray.STRING, sslParamProxy.getApplicationProtocols(params));
+            sslParamProxy.setApplicationProtocols(params, applicationProtocols);
         }
         Platform.setSSLParameters(params, impl, (AbstractConscryptSocket) socket);
         assertEquals("some.host", ((AbstractConscryptSocket) socket).getHostname());
@@ -90,7 +72,6 @@ public class PlatformTest {
 
     @Test
     public void test_getSSLParameters_Socket() throws Exception {
-        assumeJava8();
         Socket socket = new OpenSSLSocketFactoryImpl().createSocket();
         SSLParametersImpl impl = SSLParametersImpl.getDefault();
         SSLParameters params = new SSLParameters();
@@ -98,6 +79,7 @@ public class PlatformTest {
         impl.setEndpointIdentificationAlgorithm("ABC");
         String[] applicationProtocols = new String[] {"foo", "bar"};
         if (isJavaVersion(9)) {
+            assertArrayEquals(EmptyArray.STRING, impl.getApplicationProtocols());
             impl.setApplicationProtocols(applicationProtocols);
         }
         ((AbstractConscryptSocket) socket).setHostname("some.host");
@@ -106,24 +88,24 @@ public class PlatformTest {
         assertFalse(params.getUseCipherSuitesOrder());
         assertEquals("ABC", params.getEndpointIdentificationAlgorithm());
         if (isJavaVersion(9)) {
-            assertArrayEquals(applicationProtocols, getApplicationProtocols(params));
+            assertArrayEquals(applicationProtocols, sslParamProxy.getApplicationProtocols(params));
         }
     }
 
     @Test
     public void test_setSSLParameters_Engine() throws Exception {
-        assumeJava8();
         SSLParametersImpl impl = SSLParametersImpl.getDefault();
         SSLParameters params = new SSLParameters();
         ConscryptEngine engine = new ConscryptEngine(impl);
-        List<SNIServerName> names = new ArrayList<SNIServerName>();
+        List<SNIServerName> names = new ArrayList<>();
         names.add(new SNIHostName("some.host"));
         params.setServerNames(names);
         params.setUseCipherSuitesOrder(false);
         params.setEndpointIdentificationAlgorithm("ABC");
         String[] applicationProtocols = new String[] {"foo", "bar"};
         if (isJavaVersion(9)) {
-            setApplicationProtocols(params, applicationProtocols);
+            assertArrayEquals(EmptyArray.STRING, sslParamProxy.getApplicationProtocols(params));
+            sslParamProxy.setApplicationProtocols(params, applicationProtocols);
         }
         Platform.setSSLParameters(params, impl, engine);
         assertEquals("some.host", engine.getHostname());
@@ -136,7 +118,6 @@ public class PlatformTest {
 
     @Test
     public void test_getSSLParameters_Engine() throws Exception {
-        assumeJava8();
         SSLParametersImpl impl = SSLParametersImpl.getDefault();
         SSLParameters params = new SSLParameters();
         ConscryptEngine engine = new ConscryptEngine(impl);
@@ -145,6 +126,7 @@ public class PlatformTest {
         engine.setHostname("some.host");
         String[] applicationProtocols = new String[] {"foo", "bar"};
         if (isJavaVersion(9)) {
+            assertArrayEquals(EmptyArray.STRING, impl.getApplicationProtocols());
             impl.setApplicationProtocols(applicationProtocols);
         }
         Platform.getSSLParameters(params, impl, engine);
@@ -152,7 +134,7 @@ public class PlatformTest {
         assertFalse(params.getUseCipherSuitesOrder());
         assertEquals("ABC", params.getEndpointIdentificationAlgorithm());
         if (isJavaVersion(9)) {
-            assertArrayEquals(applicationProtocols, getApplicationProtocols(params));
+            assertArrayEquals(applicationProtocols, sslParamProxy.getApplicationProtocols(params));
         }
     }
 
@@ -190,26 +172,5 @@ public class PlatformTest {
         HashSet<SNIMatcher> aSet = new HashSet<>(a);
         aSet.removeAll(b);
         assertEquals(0, aSet.size());
-    }
-
-    private static String[] getApplicationProtocols(SSLParameters params) {
-        if (SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD != null) {
-            try {
-                return (String[]) SSL_PARAMETERS_GET_APPLICATION_PROTOCOLS_METHOD.invoke(params);
-            } catch (Exception ignored) {
-                // TODO(nmittler): Should we throw here?
-            }
-        }
-        return EmptyArray.STRING;
-    }
-
-    private static void setApplicationProtocols(SSLParameters params, String[] protocols) {
-        if (SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD != null) {
-            try {
-                SSL_PARAMETERS_SET_APPLICATION_PROTOCOLS_METHOD.invoke(params, (Object) protocols);
-            } catch (Exception ignored) {
-                // TODO(nmittler): Should we throw here?
-            }
-        }
     }
 }
