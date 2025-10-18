@@ -548,8 +548,9 @@ boolean isExecutableOnPath(executable) {
         }
     }
     for (String folder : System.getenv('PATH').split("" + File.pathSeparatorChar)) {
-        if (folder != '') {  // Ignore any empty PATH elements.
-        File[] files = file(folder).listFiles(filter)
+        // Ignore any empty PATH elements.
+        if (folder != '') {
+            File[] files = file(folder).listFiles(filter)
             if (files != null && files.size() > 0) {
                 return true
             }
